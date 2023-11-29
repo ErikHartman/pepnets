@@ -4,6 +4,8 @@
 
 # pepnets: clustering linear peptide sequences on protein backbones
 
+~ The first version of this repo is still under construction ~
+
 This package clusters linear peptides that are degradation products of proteins based on their sequence.
 
 ## install
