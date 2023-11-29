@@ -263,7 +263,3 @@ def get_endpoints_distance(peptide1, peptide2):
     start_dist = np.abs(peptide1.start - peptide2.start)
     end_dist = np.abs(peptide1.end - peptide2.end)
     return start_dist + end_dist
-
-
-def get_levenshtein(peptide1, peptide2):
-    return lev(peptide1.sequence, peptide2.sequence)
