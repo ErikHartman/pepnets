@@ -5,6 +5,7 @@ import matplotlib
 
 plt.rcParams["font.family"] = "Arial"
 
+
 class PeptiGram:
     def __init__(self, dm, design):
         self.dm = dm
@@ -23,6 +24,7 @@ class PeptiGram:
         size_factor: int = 1,
         save_str : str = None
     ):
+        plt.rcParams.update({'font.size': 16*size_factor})
         data = self.dm
         data["Protein"] = data["Cluster"].apply(lambda x: x.split("_")[0])
         data = data[data["Protein"] == protein].copy().reset_index()
@@ -209,11 +211,12 @@ class PeptiGram:
                                 break
                     ax.set_ylim([-heights[group_index + 1] - 2, 0])
                     ax.set_xlim(xlim)
-                    ax.set_ylabel(group)
+                    ax.set_ylabel(group, fontsize=16*size_factor)
                     ax.set_yticks([])
+                
                     ax.axhline(0, 0, 1, color="lightgray", linestyle="--")
                     sns.despine(top=True, bottom=True, right=True, left=True, ax=ax)
-
+            
             for day in days:
                 day_index = days.index(day)
                 columns = design[design["day"] == day]["sample"].values.tolist() + [
@@ -254,13 +257,13 @@ class PeptiGram:
                     #     size=10,
                     # )
                 ax.set_xlim(xlim)
-                # ax.set_title(day, pad=5)
+                ax.set_title(day, pad=5*size_factor)
                 ax.set_yticks([])
                 sns.despine(ax=ax, top=True, bottom=True, right=True, left=True)
 
         plt.suptitle(f"{protein}", y=1 + 0.1 * size_factor, fontsize=20 * size_factor)
         plt.tight_layout()
-        plt.subplots_adjust(hspace=0.05)
+        plt.subplots_adjust(hspace=0.05*size_factor)
 
         if cbar:
             cax = fig.add_axes([1.1, 0.1, 0.025, 0.8])
@@ -268,7 +271,7 @@ class PeptiGram:
             sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
             fig.colorbar(sm, cax=cax, label="AMP Score")
         if save_str:
-            plt.savefig(save_str, dpi=300)
+            plt.savefig(save_str, dpi=300, bbox_inches="tight")
 
     def parse_mod(self, mods):
         parsed_mods = []

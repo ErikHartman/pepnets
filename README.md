@@ -9,16 +9,16 @@ This package clusters linear peptides that are degradation products of proteins 
 ## install
 To install the package, clone this repo:
 ```
-git clone https://github.com/ErikHartman/pepnets.git
+> git clone https://github.com/ErikHartman/pepnets.git
 ```
 and then pip install:
 ```
-pip install path_to_root
+> pip install path_to_root
 ```
-## Usage
+## usage
 
 
-```
+```py
 pnet = PeptideNetwork(
     datamatrix=datamatrix,
     protein_database=sus_scrofa,
@@ -26,16 +26,15 @@ pnet = PeptideNetwork(
 
 pnet.get_clusters(resolution=0.8)
 ```
-```
+```py
 pnet.plot_protein(protein="APOA1")
 ```
 ![network](plots/APOA1.png "network")
-```
-from pepnets.FeatureMatrix import FeatureMatrix
+```py
 
 fm = FeatureMatrix(datamatrix, pnet.clusters)
 ```
-```
+```py
 design = pd.read_csv("../data/design.csv")
 peptigram = PeptiGram(fm.datamatrix, design)
 peptigram.plot_peptigram(
@@ -46,5 +45,5 @@ peptigram.plot_peptigram(
 
 For more examples, see `notebooks`.
 
-## Dependencies
+## dependencies
 This package is heavily dependent on `networkx` for graph creation, `leidenalg` for community detection, and several packages for manipulation and plotting (`pandas, numpy, matplotlib, seaborn`).
