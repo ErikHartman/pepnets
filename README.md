@@ -1,4 +1,7 @@
-<img src="logo.png" style="display:block;margin-left:auto;margin-right:auto;"></img>
+<p align="center">
+    <img src="logo.png", width="250" />
+<p>
+
 # pepnets: clustering peptides on protein backbones
 
 This package clusters peptides that are degradation products of proteins.
