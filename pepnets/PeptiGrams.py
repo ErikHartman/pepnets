@@ -5,25 +5,6 @@ import matplotlib
 
 plt.rcParams["font.family"] = "Arial"
 
-label_replacer = {
-    "S. aureus": "S. a",
-    "P. aeruginosa": "P. a",
-    "Double infection": "Doub. inf.",
-    "Ctrl": "Ctrl",
-    "AMP": "AMP",
-    "Accidental double infection": "ADI",
-    "P. aeruginosa after antibiotics": "P. a ab",
-    "test_group": "test_group",
-    "other": "other",
-    "Group 1": "G1",
-    "Group 2": "G2",
-    "Group 3": "G3",
-    "Low NE": "Low NE",
-    "High NE": "High NE",
-    "Medium NE": "Medium NE"
-}
-
-
 class PeptiGram:
     def __init__(self, dm, design):
         self.dm = dm
@@ -40,6 +21,7 @@ class PeptiGram:
         print_mods: bool = True,
         xlim: list = [0, 0],
         size_factor: int = 1,
+        save_str : str = None
     ):
         data = self.dm
         data["Protein"] = data["Cluster"].apply(lambda x: x.split("_")[0])
@@ -227,7 +209,7 @@ class PeptiGram:
                                 break
                     ax.set_ylim([-heights[group_index + 1] - 2, 0])
                     ax.set_xlim(xlim)
-                    ax.set_ylabel(label_replacer[group])
+                    ax.set_ylabel(group)
                     ax.set_yticks([])
                     ax.axhline(0, 0, 1, color="lightgray", linestyle="--")
                     sns.despine(top=True, bottom=True, right=True, left=True, ax=ax)
@@ -285,6 +267,8 @@ class PeptiGram:
             norm = matplotlib.colors.Normalize(vmin=0, vmax=max_color_int)
             sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
             fig.colorbar(sm, cax=cax, label="AMP Score")
+        if save_str:
+            plt.savefig(save_str, dpi=300)
 
     def parse_mod(self, mods):
         parsed_mods = []
