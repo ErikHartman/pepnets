@@ -2,7 +2,7 @@
     <img src="logo.png", width="250" />
 <p>
 
-# pepnets: clustering peptides on protein backbones
+# pepnets: clustering linear peptide sequences on protein backbones
 
 This package clusters linear peptides that are degradation products of proteins based on their sequence.
 
@@ -42,6 +42,15 @@ peptigram.plot_peptigram(
 )
 ```
 ![peptigram](plots/APOA1_pg.png "peptigram")
+
+```py
+lp = LogoPlot(fm.datamatrix, design, sus_scrofa, topn)
+height = lp.get_letter_heights(test_samples, background_samples)
+fig, ax = plt.subplots(1,1)
+lp.plot(height, ax=ax)
+```
+
+![logo](plots/logo.png "logoplot")
 
 For more examples, see `notebooks`.
 

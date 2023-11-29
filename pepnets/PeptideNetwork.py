@@ -36,7 +36,9 @@ class PeptideNetwork:
         peptides = []
         proteins = []
         id = 0
+        total_n_peptides = len(self.datamatrix.index)
         for _, row in self.datamatrix.iterrows():
+            print(f"{id} /{total_n_peptides}", end="\r")
             protein = row["Protein"]
             peptide = row["Peptide"]
             start = self._get_peptide_start(peptide, row["Protein"])
@@ -103,6 +105,8 @@ class PeptideNetwork:
         for protein, G in zip(
             self.protein_networks.keys(), self.protein_networks.values()
         ):
+            if len(G.edges()) == 0:
+                continue
             H = ig.Graph.from_networkx(G)
             partition = leidenalg.find_partition(
                 H,
