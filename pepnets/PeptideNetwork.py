@@ -38,7 +38,7 @@ class PeptideNetwork:
         id = 0
         total_n_peptides = len(self.datamatrix.index)
         for _, row in self.datamatrix.iterrows():
-            print(f"{id} /{total_n_peptides}", end="\r")
+            print(f"{id} / {total_n_peptides}", end="\r")
             protein = row["Protein"]
             peptide = row["Peptide"]
             start = self._get_peptide_start(peptide, row["Protein"])

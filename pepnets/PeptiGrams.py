@@ -251,11 +251,11 @@ class PeptiGram:
                         alpha=0.5,
                     )
 
-                    # ax.annotate(
-                    #     cluster.split("_")[-1],
-                    #     xy=(np.argmax(spaces), np.max(spaces)),
-                    #     size=10,
-                    # )
+                    ax.annotate(
+                         cluster.split("_")[-1],
+                         xy=(np.argmax(spaces), np.max(spaces)),
+                         size=10,
+                     )
                 ax.set_xlim(xlim)
                 ax.set_title(day, pad=5*size_factor)
                 ax.set_yticks([])
