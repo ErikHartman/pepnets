@@ -4,9 +4,14 @@
 
 # pepnets: clustering linear peptide sequences on protein backbones
 
-~ The first version of this repo is still under construction ~
+This package clusters linear peptides that are degradation products of proteins based on their sequence. The package was created and used in a [study where we analyzed the wound fluids from infected wounds.](https://www.biorxiv.org/content/10.1101/2023.12.28.573527v1) The example data in the [notebook](notebooks/example.ipynb) and showcased [below](#usage) is from that study.
 
-This package clusters linear peptides that are degradation products of proteins based on their sequence.
+The package includes modules to perform the clustering and 3 modules for down-stream analysis and visualization:
+
+- FeatureMatrix: generates a feature matrix which can be used for further analysis of clusters.
+- PeptiGrams: Plots [peptigram-esque](http://bioware.ucd.ie/peptigram/) plots to visualize the peptidome from a protein.
+- LogoPlot: Computes and plots the cut-site specificity. 
+
 
 ## install
 To install the package, clone this repo:
@@ -17,8 +22,10 @@ and then pip install:
 ```
 > pip install path_to_root
 ```
-## usage
 
+The software has been tested with python 3.9.6
+
+## usage
 
 ```py
 pnet = PeptideNetwork(
