@@ -98,12 +98,13 @@ class PeptideClusters:
         )
         return sorted_clusters[:n]
 
-    def get_cluster(self, peptide, protein):
+    def get_cluster(self, peptide, protein, verbose=False):
         for cluster in self.clusters:
             if protein == cluster.protein:
                 if peptide in cluster.peptide_sequences:
                     return cluster
-        print(f"cluster for {peptide} ({protein}) not found")
+        if verbose:
+            print(f"cluster for {peptide} ({protein}) not found")
         return None
 
     def to_edgelist(self, savepath):
@@ -162,23 +163,36 @@ class PeptideClusters:
                     f"{cluster.id}\t{protein}\t{start}\t{end}\t{peptide_sequences}\t{np1}\t{np1p}\t{cp1}\t{cp1p}\t{longest_peptide}\n"
                 )
 
-    def to_df(self):
+    def to_df(self, database):
         save_dict = {
-            "cluster": [],
-            "protein": [],
-            "peptide": [],
-            "start": [],
-            "end": [],
-            "n_peptides": [],
+            "ID": [],
+            "Protein": [],
+            "Longest": [],
+            "Start": [],
+            "End": [],
+            "Np1": [],
+            "Np1p": [],
+            "Cp1": [],
+            "Cp1p": [],
+
         }
         for cluster in self.clusters:
-            for peptide in cluster.peptides:
-                save_dict["cluster"].append(cluster.id)
-                save_dict["protein"].append(peptide.protein)
-                save_dict["peptide"].append(peptide.sequence)
-                save_dict["start"].append(peptide.start)
-                save_dict["end"].append(peptide.end)
-                save_dict["n_peptides"].append(cluster.n_peptides)
+            start = cluster.start
+            end = cluster.end
+            protein = cluster.protein
+            peptide_sequences = cluster.peptide_sequences
+            longest_peptide = sorted(peptide_sequences, key=lambda x: len(x), reverse=True)[0]
+            np1, np1p, cp1, cp1p = self._get_flanks(protein, start, end, database)
+            save_dict["Protein"].append(protein)
+            save_dict["Start"].append(start)
+            save_dict["End"].append(end)
+            save_dict["ID"].append(cluster.id)
+            save_dict["Np1"].append(np1)
+            save_dict["Np1p"].append(np1p)
+            save_dict["Cp1"].append(cp1)
+            save_dict["Cp1p"].append(cp1p)
+            save_dict["Longest"].append(longest_peptide)
+
 
         return pd.DataFrame(save_dict)
 
