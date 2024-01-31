@@ -13,6 +13,13 @@ The package includes modules to perform the clustering and 3 modules for down-st
 - LogoPlot: Computes and plots the cut-site specificity. 
 
 
+## analysis
+
+The repo also contains code to recreate the majority of the figures from the [study](https://www.biorxiv.org/content/10.1101/2023.12.28.573527v1) in the `/notebook/analysis.ipynb`- notebook. The notebook is seeded, but non-deterministic algorithms (e.g., Leiden) may still result in slight variations due to different processors. These variations do not impact any conclusions drawn in the paper.
+
+To run the `/notebook/analysis.ipynb`- notebook, you need to install additional dependencies from the ones described below.
+
+
 ## install
 To install the package, clone this repo:
 ```
