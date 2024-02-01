@@ -3,8 +3,6 @@ import seaborn as sns
 import numpy as np
 import matplotlib
 
-plt.rcParams["font.family"] = "Arial"
-
 
 class PeptiGram:
     def __init__(self, dm, design):

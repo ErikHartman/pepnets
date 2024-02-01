@@ -1,13 +1,10 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from pepnets.palette import *
 import seaborn as sns
 import logomaker
 from collections import Counter
 
-
-plt.rcParams["font.family"] = "Arial"
 
 amino_acids = list("ARNDBCEQZGHILKMFPSTWYV*")
 
