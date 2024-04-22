@@ -1,7 +1,9 @@
 import pandas as pd
+from pepnets.PeptideCluster import PeptideCluster
+
 
 class PeptideClusters:
-    def __init__(self, clusters: list()):
+    def __init__(self, clusters):
         self.clusters = clusters
         self.n_clusters = len(clusters)
         self.proteins = self.get_proteins()
@@ -27,7 +29,6 @@ class PeptideClusters:
         for cluster in self.clusters:
             if cluster_id == cluster.id:
                 return cluster
-        print(f"cluster {cluster_id} not found")
         return None
 
     def add_cluster(
@@ -98,13 +99,11 @@ class PeptideClusters:
         )
         return sorted_clusters[:n]
 
-    def get_cluster(self, peptide, protein, verbose=False):
+    def get_cluster(self, peptide, protein):
         for cluster in self.clusters:
             if protein == cluster.protein:
                 if peptide in cluster.peptide_sequences:
                     return cluster
-        if verbose:
-            print(f"cluster for {peptide} ({protein}) not found")
         return None
 
     def to_edgelist(self, savepath):
@@ -120,81 +119,83 @@ class PeptideClusters:
                         f"{cluster.id}: ({cluster.start}-{cluster.end})\t{cluster.protein}\n"
                     )
 
-    def to_feature_edgelist(self, savepath):
-        with open(savepath, "w") as f:
-            f.write(f"from\tto\n")
-            for cluster in self.clusters:
-                f.write(
-                    f"{cluster.id}_n_peptides\t{cluster.id}: ({cluster.start}-{cluster.end})\n"
-                )
-                f.write(
-                    f"{cluster.id}_intensity\t{cluster.id}: ({cluster.start}-{cluster.end})\n"
-                )
-                f.write(
-                    f"{cluster.id}: ({cluster.start}-{cluster.end})\t{cluster.protein}\n"
-                )
-
     def _get_aa(self, protein, index, database):
-        sequence = database[database["Entry Name"] == f"{protein}"]["Sequence"].values[0]
         try:
+            sequence = database[protein]
             return sequence[index]
         except:
             return None
-        
-     
-    def _get_flanks(self, protein, start, end, database):  
-        np1 = self._get_aa(protein, start-1, database)
+
+    def _get_flanks(self, protein, start, end, database):
+        np1 = self._get_aa(protein, start - 1, database)
         np1p = self._get_aa(protein, start, database)
-        cp1 = self._get_aa(protein, end-1, database)
+        cp1 = self._get_aa(protein, end - 1, database)
         cp1p = self._get_aa(protein, end, database)
         return np1, np1p, cp1, cp1p
-    
-    def to_tsv(self, savepath, database):
-        with open(savepath, "w") as f:
-            f.write(f"ID\tProtein\tStart\tEnd\tPeptides\tNp1\tNp1p\tCp1\tCp1p\tLongest\n")
-            for cluster in self.clusters:
-                start = cluster.start
-                end = cluster.end
-                protein = cluster.protein
-                peptide_sequences = cluster.peptide_sequences
-                longest_peptide = sorted(peptide_sequences, key=lambda x: len(x), reverse=True)[0]
-                np1, np1p, cp1, cp1p = self._get_flanks(protein, start, end, database)
-                f.write(
-                    f"{cluster.id}\t{protein}\t{start}\t{end}\t{peptide_sequences}\t{np1}\t{np1p}\t{cp1}\t{cp1p}\t{longest_peptide}\n"
-                )
 
-    def to_df(self, database):
-        save_dict = {
-            "ID": [],
-            "Protein": [],
-            "Longest": [],
-            "Start": [],
-            "End": [],
-            "Np1": [],
-            "Np1p": [],
-            "Cp1": [],
-            "Cp1p": [],
+    def to_df(self, database: dict):
+        data = []
+        columns = [
+            "ID",
+            "name",
+            "hash",
+            "Protein",
+            "Start",
+            "End",
+            "Peptides",
+            "Np1",
+            "Np1p",
+            "Cp1",
+            "Cp1p",
+            "Longest",
+        ]
 
-        }
         for cluster in self.clusters:
+            cluster: PeptideCluster
             start = cluster.start
             end = cluster.end
+            name = cluster.name()
+            hash = cluster.hash()
             protein = cluster.protein
             peptide_sequences = cluster.peptide_sequences
-            longest_peptide = sorted(peptide_sequences, key=lambda x: len(x), reverse=True)[0]
+            longest_peptide = sorted(
+                peptide_sequences, key=lambda x: len(x), reverse=True
+            )[0]
             np1, np1p, cp1, cp1p = self._get_flanks(protein, start, end, database)
-            save_dict["Protein"].append(protein)
-            save_dict["Start"].append(start)
-            save_dict["End"].append(end)
-            save_dict["ID"].append(cluster.id)
-            save_dict["Np1"].append(np1)
-            save_dict["Np1p"].append(np1p)
-            save_dict["Cp1"].append(cp1)
-            save_dict["Cp1p"].append(cp1p)
-            save_dict["Longest"].append(longest_peptide)
 
+            row_dict = {
+                "ID": cluster.id,
+                "name": name,
+                "hash": hash,
+                "Protein": protein,
+                "Start": start,
+                "End": end,
+                "Peptides": peptide_sequences,
+                "Np1": np1,
+                "Np1p": np1p,
+                "Cp1": cp1,
+                "Cp1p": cp1p,
+                "Longest": longest_peptide,
+            }
+            data.append(row_dict)
 
-        return pd.DataFrame(save_dict)
+        return pd.DataFrame(data, columns=columns)
+
+    def get_mapping(self, database_dict):
+        cl_df = self.to_df(database_dict)
+
+        cl_df = cl_df[["hash", "ID", "name"]]
+        mapping = (
+            cl_df.groupby("hash", as_index=False)
+            .agg({"ID": lambda x: " | ".join(x), "name": lambda x: " | ".join(x)})
+            .merge(
+                cl_df,
+                left_on="hash",
+                right_on="hash",
+                suffixes=["_combined", "_single"],
+            )[["ID_combined", "name_combined", "ID_single", "name_single"]]
+        )
+        return mapping
 
     def __repr__(self) -> str:
         return f"{[cluster.id for cluster in self.clusters]}"

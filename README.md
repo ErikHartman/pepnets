@@ -1,8 +1,8 @@
 <p align="center">
-    <img src="logo.png", width="250" />
+    <img src="Asset 4.svg", width="250" />
 <p>
 
-# pepnets: clustering linear peptide sequences on protein backbones
+# clustering linear peptide sequences on protein backbones
 
 This package clusters linear peptides that are degradation products of proteins based on their sequence. The package was created and used in a [study where we analyzed the wound fluids from infected wounds.](https://www.biorxiv.org/content/10.1101/2023.12.28.573527v1) The example data in the [notebook](notebooks/example.ipynb) and showcased [below](#usage) is from that study.
 

@@ -10,7 +10,7 @@ import matplotlib.cm as cm
 from pepnets.PeptideCluster import PeptideCluster
 from pepnets.PeptideClusters import PeptideClusters
 from pepnets.Peptide import Peptide
-
+from umap import UMAP
 
 
 plt.rcParams["font.family"] = "Arial"
@@ -20,14 +20,13 @@ class PeptideNetwork:
     def __init__(
         self,
         datamatrix: pd.DataFrame,
-        protein_database: pd.DataFrame,
+        protein_database: dict,
     ):
-        self.datamatrix = datamatrix.sort_values("Start", ascending=False)
+        self.datamatrix = datamatrix
         self.protein_database = protein_database
         if protein_database is not None:
-            proteins_in_database = protein_database["Entry Name"].values.tolist()
             self.datamatrix = self.datamatrix[
-                self.datamatrix["Protein"].isin(proteins_in_database)
+                self.datamatrix["Protein"].isin(protein_database.keys())
             ]
         self.peptides, self.proteins = self._generate_peptides()
 
@@ -48,8 +47,13 @@ class PeptideNetwork:
         proteins = list(set(proteins))
         return peptides, proteins
 
-
-    def create_network(self, distance_cutoff: int = 4):
+    def create_network(
+        self,
+        distance_cutoff: float = 4,
+        lambda_length_ratio: float = 1,
+        lambda_overlap_distance: float = 1,
+        lambda_center_distance: float = 1,
+    ):
         protein_networks = {}
         for protein in self.proteins:
             peptides_in_protein = [
@@ -57,6 +61,7 @@ class PeptideNetwork:
             ]
             G = nx.Graph()
             for peptide in peptides_in_protein:
+                peptide: Peptide
                 G.add_node(
                     peptide.id,
                     peptide=peptide.sequence,
@@ -67,6 +72,8 @@ class PeptideNetwork:
 
             for i, peptide_from in enumerate(peptides_in_protein):
                 for peptide_to_index in range(i + 1):
+                    peptide_from: Peptide
+                    peptide_to: Peptide
                     peptide_to = peptides_in_protein[peptide_to_index]
 
                     overlap_percentage = get_overlap_percentage(
@@ -85,10 +92,13 @@ class PeptideNetwork:
 
                     center_distance = get_center_distance(peptide_from, peptide_to)
 
-                    d = length_ratio + overlap_distance + center_distance
+                    d = (
+                        (length_ratio * lambda_length_ratio)
+                        + (overlap_distance * lambda_overlap_distance)
+                        + (center_distance * lambda_center_distance)
+                    )
 
                     if d <= distance_cutoff:
-                        d = d + epsilon
                         G.add_edge(
                             peptide_from.id,
                             peptide_to.id,
@@ -149,19 +159,15 @@ class PeptideNetwork:
         return None
 
     def _get_protein_sequence(self, protein):
-        if protein in self.protein_database["Entry Name"].values.tolist():
-            protein_seq = self.protein_database[
-                self.protein_database["Entry Name"] == protein
-            ]["Sequence"].values[0]
+        if protein in self.protein_database.keys():
+            protein_seq = self.protein_database[protein]
             return protein_seq
         return "Not in database"
 
     def _get_peptide_start(self, peptide, protein):
         if self.protein_database is not None:
-            if protein in self.protein_database["Entry Name"].values.tolist():
-                protein_seq = self.protein_database[
-                    self.protein_database["Entry Name"] == protein
-                ]["Sequence"].values[0]
+            if protein in self.protein_database.keys():
+                protein_seq = self.protein_database[protein]
                 start = protein_seq.find(peptide)
                 return start
             print(f"Protein {protein} not in database.")
@@ -171,7 +177,9 @@ class PeptideNetwork:
             ].values[0]
         return "Not in database"
 
-    def plot_protein(self, protein, save_str=None, figsize=(8,4)):
+    def plot_protein(
+        self, protein, save_str=None, figsize=(8, 4), resolution=0.8, random_state=42
+    ):
         plt.clf()
         fig, axs = plt.subplots(1, 2, figsize=figsize)
         graph = self.protein_networks[protein]
@@ -181,16 +189,20 @@ class PeptideNetwork:
             leidenalg.RBConfigurationVertexPartition,
             n_iterations=4,
             weights="distance_inv",
-            resolution_parameter=.8,
+            resolution_parameter=resolution,
+            seed=random_state,
         )
         clusters = {}
         for i, cluster in enumerate(partition):
             for node in cluster:
                 peptide_id = H.vs[node]["_nx_name"]
                 clusters[peptide_id] = i
-        partition=clusters
+        partition = clusters
         layout = nx.spring_layout(
-            graph, weight="distance_inv", k=1.5 / np.sqrt(graph.number_of_nodes())
+            graph,
+            weight="distance_inv",
+            k=1.5 / np.sqrt(graph.number_of_nodes()),
+            seed=random_state,
         )
 
         cmap_partition = cm.get_cmap("tab20", max(partition.values()) + 1)
@@ -226,8 +238,97 @@ class PeptideNetwork:
         if save_str:
             plt.savefig(save_str, dpi=1200)
 
+    def plot_protein_umap(
+        self, protein, figsize=(8, 4), resolution=0.8, random_state=42
+    ):
+        plt.clf()
+        fig, axs = plt.subplots(
+            1, 5, figsize=figsize, width_ratios=[1, 0.05, 0.3, 1, 0.05]
+        )
+        graph = self.protein_networks[protein]
 
-def get_overlap_percentage(peptide1, peptide2, divisor="total_length"):
+        adj = nx.adjacency_matrix(graph, weight="distance_inv").todense()
+
+        H = ig.Graph.from_networkx(graph)
+        partition = leidenalg.find_partition(
+            H,
+            leidenalg.RBConfigurationVertexPartition,
+            n_iterations=4,
+            weights="distance_inv",
+            resolution_parameter=resolution,
+            seed=random_state,
+        )
+        clusters = {}
+        for i, cluster in enumerate(partition):
+            for node in cluster:
+                peptide_id = H.vs[node]["_nx_name"]
+                clusters[peptide_id] = i
+        partition = clusters
+        reducer = UMAP(metric="precomputed", random_state=random_state)
+
+        X_reduced = reducer.fit_transform(adj)
+
+        plot_df = pd.DataFrame(X_reduced, columns=["UMAP1", "UMAP2"])
+
+        plot_df["Cluster"] = partition.values()
+        plot_df["Peptide midpoint"] = [
+            graph.nodes[n]["start"]
+            + ((graph.nodes[n]["end"] - graph.nodes[n]["start"]) / 2)
+            for n in graph.nodes()
+        ]
+        plot_df["Peptide length"] = [
+            len(graph.nodes[n]["peptide"]) for n in graph.nodes()
+        ]
+
+        sns.scatterplot(
+            plot_df,
+            x="UMAP1",
+            y="UMAP2",
+            hue="Peptide midpoint",
+            palette="Blues",
+            ax=axs[0],
+            linewidth=0,
+            s=20,
+        )
+
+        norm = plt.Normalize(
+            plot_df["Peptide midpoint"].min(), plot_df["Peptide midpoint"].max()
+        )
+        sm = plt.cm.ScalarMappable(cmap="Blues", norm=norm)
+        sm.set_array([])
+
+        axs[0].get_legend().remove()
+        plt.colorbar(sm, ax=axs[0], cax=axs[1], label="Peptide midpoint")
+        axs[0].set_xticks([])
+        axs[0].set_yticks([])
+
+        sns.scatterplot(
+            plot_df,
+            x="UMAP1",
+            y="UMAP2",
+            hue="Cluster",
+            palette="tab20c",
+            ax=axs[3],
+            linewidth=0,
+            s=20,
+        )
+        norm = plt.Normalize(plot_df["Cluster"].min(), plot_df["Cluster"].max())
+        sm = plt.cm.ScalarMappable(cmap="tab20c", norm=norm)
+        sm.set_array([])
+
+        axs[3].get_legend().remove()
+        plt.colorbar(sm, ax=axs[2], cax=axs[4], label="Designated cluster")
+        axs[3].set_xticks([])
+        axs[3].set_yticks([])
+
+        axs[2].set_xticks([])
+        axs[2].set_yticks([])
+        axs[2].set_zorder(axs[2].get_zorder()-1)
+        sns.despine(left=True, right=True, bottom=True, top=True)
+        # plt.tight_layout()
+
+
+def get_overlap_percentage(peptide1: Peptide, peptide2: Peptide):
     if peptide1.start > peptide2.start:
         peptide1, peptide2 = peptide2, peptide1
 
@@ -240,30 +341,23 @@ def get_overlap_percentage(peptide1, peptide2, divisor="total_length"):
     overlap = peptide1.end - peptide2.start
     total_length = peptide1.length + peptide2.length - overlap
 
-    if divisor == "total_length":
-        return overlap / (total_length)
-    elif divisor == "longest_peptide":
-        return overlap / max(peptide1.length, peptide2.length)
-    elif divisor == "shortest_peptide":
-        return overlap / min(peptide1.length, peptide2.length)
-    elif divisor == None:
-        return total_length - overlap
+    return overlap / (total_length)
 
 
-def get_center_distance(peptide1, peptide2):
+def get_center_distance(peptide1: Peptide, peptide2: Peptide):
     center_distance = np.abs(peptide1.center - peptide2.center)
     return center_distance
 
 
-def get_length_difference(peptide1, peptide2):
+def get_length_difference(peptide1: Peptide, peptide2: Peptide):
     return np.abs(peptide1.length - peptide2.length)
 
 
-def get_length_ratio(peptide1, peptide2):
+def get_length_ratio(peptide1: Peptide, peptide2: Peptide):
     return max(peptide1.length / peptide2.length, peptide2.length / peptide1.length)
 
 
-def get_endpoints_distance(peptide1, peptide2):
+def get_endpoints_distance(peptide1: Peptide, peptide2: Peptide):
     start_dist = np.abs(peptide1.start - peptide2.start)
     end_dist = np.abs(peptide1.end - peptide2.end)
     return start_dist + end_dist

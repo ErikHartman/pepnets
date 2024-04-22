@@ -1,5 +1,5 @@
 import numpy as np
-from collections import Counter
+from pepnets.util import custom_mode
 
 
 class PeptideCluster:
@@ -9,14 +9,14 @@ class PeptideCluster:
         self.protein = protein
         self.n_peptides = len(peptides)
         self.peptide_sequences = self._get_unique_peptides()
-        self.start, self.end = self._get_endpoints()
+        self.start, self.end = self._get_endpoints(method="mode")
         self.inter_cluster_distance = self._get_inter_cluster_distance()
 
     def _get_unique_peptides(self):
         peptides = set()
         for peptide in self.peptides:
             peptides.add(peptide.sequence)
-        return list(peptides)
+        return sorted(list(peptides))
 
     def _get_endpoints(self, method="mode"):
         starts = []
@@ -27,16 +27,8 @@ class PeptideCluster:
         if len(self.peptides) == 0:
             return 0, 0
         if method == "mode":
-            start_counter = Counter(starts)
-            end_counter = Counter(ends)
-            if max(start_counter.values()) == 1:
-                start = min(starts)
-            else:
-                start = max(set(starts), key=starts.count)
-            if max(end_counter.values()) == 1:
-                end = max(ends)
-            else:
-                end = max(set(ends), key=ends.count)
+            start = custom_mode(starts, equal_strategy="min")
+            end = custom_mode(ends, equal_strategy="max")
             return start, end
         elif method == "longest":
             return min(starts), max(ends)
@@ -67,10 +59,20 @@ class PeptideCluster:
                 n_distances += 1
         return center_distance / n_distances
 
+
     def is_empty(self):
         if len(self.peptides) == 0:
             return True
         return False
+
+    def hash(self):
+        hash_peptide = ""
+        for peptide in self.peptide_sequences:
+            hash_peptide += peptide
+        return hash_peptide
+    
+    def name(self):
+        return f"{self.protein} ({self.start}-{self.end})"
 
     def __repr__(self) -> str:
         return f"{self.id}, proteins: ({self.protein}), #peptides: {self.n_peptides}"

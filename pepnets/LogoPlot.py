@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from pepnets.palette import *
 import seaborn as sns
 import logomaker
-from collections import Counter
+from pepnets.util import custom_mode
 
+
+plt.rcParams["font.family"] = "Arial"
 
 amino_acids = list("ARNDBCEQZGHILKMFPSTWYV*")
 
@@ -30,76 +33,65 @@ class LogoPlot:
     def __init__(
         self,
         datamatrix: pd.DataFrame,
-        design: pd.DataFrame,
-        database: pd.DataFrame,
-        topn: pd.DataFrame,
-        species: str = "PIG",
-        weight: str = "mean_int",
-        drop: list = None
+        database: dict,  # dict of identifier:sequence
+        drop: list = None,
+        entity : str = "Cluster"
     ):
         self.dm = datamatrix
-        self.design = design
         self.database = database
-        self.species = species
-        self.topn = topn
-        self.weight = weight
         self.drop = drop
+        self.entity = entity
 
     def get_letter_heights(self, test_samples: list, background_samples: list):
-        test_nc = self.get_nc(test_samples)
-        back_nc = self.get_nc(background_samples)
-        height = get_height_from_norm(test_nc, back_nc)
+        test_nc = self.get_terminal_amino_acid_frequencies(test_samples)
+        back_nc = self.get_terminal_amino_acid_frequencies(background_samples)
+        height = get_kl(test_nc.T, back_nc.T)
+
         height["index"] = [-4, -3, -2, -1, 1, 2, 3, 4]
         height.set_index("index", inplace=True)
         return height
 
     def plot(self, height, ax):
-        logo = logomaker.Logo(height, color_scheme=color_scheme, ax=ax)
+        _ = logomaker.Logo(height, color_scheme=color_scheme, ax=ax)
 
-    def get_nc(self, samples: list):
-        n, c = self._prepare_data(samples)
-        nc = pd.concat([n, c])
-        nc_freq = self.get_frequency_dict(nc)
-        if self.drop:
-            nc_freq = nc_freq.drop(index=self.drop)
+    def get_terminal_amino_acid_frequencies(self, samples: list):
+        nc = self._get_terminal_amino_acid_counts(samples)
+        nc_freq = self._get_frequency_df(nc)
         nc = nc_freq / nc_freq.sum(axis=0)
         return nc
 
-    def _prepare_data(self, samples: list) -> (pd.DataFrame, pd.DataFrame):
-        """
-        Return two dataframes for the n-term and c-term respectively
-        """
+    def _get_terminal_amino_acid_counts(self, samples: list,):
         dm = self.dm.copy()
-        dm["mean_int"] = dm[samples].mean(axis=1)
-        dm = dm[dm["mean_int"] > 0].copy()
-        dm = dm[["Cluster", "Protein", "Start", "End", "mean_int"]]
-        dm = dm.groupby(["Cluster", "Protein"], as_index=False).agg(
+        dm["sum_int"] = dm[samples].sum(axis=1)
+        dm = dm[dm["sum_int"] > 0].copy()
+        dm = dm[[self.entity, "Protein", "Start", "End", "sum_int"]]
+        dm = dm.groupby([self.entity, "Protein"], as_index=False).agg(
             {
-                "Start": lambda x:  min(x) if max(Counter(x).values()) == 1 else max(list(x), key=list(x).count),
-                "End": lambda x:  max(x) if max(Counter(x).values()) == 1 else max(list(x), key=list(x).count),
-                "mean_int": "mean",
+                "Start": lambda x: (custom_mode(x, equal_strategy="min")),
+                "End": lambda x: (custom_mode(x, equal_strategy="max")),
+                "sum_int": "mean",
             }
         )
-        dm = dm[["Cluster", "Start", "Protein", "End", "mean_int"]]
+        
+        dm = dm[[self.entity, "Start", "Protein", "End", "sum_int"]]
+
         n_term = self._get_flanks(dm, term="n")
         c_term = self._get_flanks(dm, term="c")
-        n_term.drop(columns={"Start", "End", "Cluster"}, inplace=True)
-        c_term.drop(columns={"Start", "End", "Cluster"}, inplace=True)
+        nc = pd.concat([n_term, c_term])
+        nc.drop(columns={"Start", "End", self.entity}, inplace=True)
+        if self.drop:
+            nc = n_term[~n_term["p1"].isin(self.drop)]
 
-        return n_term, c_term
+        return nc
 
-    def get_frequency_dict(self, nc, impute=0.0001) -> pd.DataFrame:
-        """
-        Returns a frequency dict from a frequency dataframe
-        """
+    def _get_frequency_df(self, nc, impute=1e-4) -> pd.DataFrame:
         frequency_dict = {}
 
         for position in positions:
             frequency_dict[position] = {aa: impute for aa in amino_acids}
-
         nc["count"] = 1
         for _, row in nc.iterrows():
-            value = row[self.weight]
+            value = row["sum_int"]
             for position in positions:
                 aa_at_position = row[position]
                 if aa_at_position not in ["X", None]:
@@ -107,9 +99,7 @@ class LogoPlot:
         return pd.DataFrame(frequency_dict)
 
     def _get_aa(self, protein, index):
-        sequence = self.database[
-            self.database["Entry Name"].isin([f"{protein}_PIG", f"{protein}_HUMAN"])
-        ]["Sequence"].values[0]
+        sequence = self.database[protein]
         try:
             return sequence[index]
         except:
@@ -118,55 +108,49 @@ class LogoPlot:
     def _get_flanks(self, df, term="n"):
         if term == "n":
             start_or_end = "Start"
-            add = 0
         else:
             start_or_end = "End"
-            add = 1
         df = df.copy()
+        
         df["p4"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 5 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 4),
             axis=1,
         )
         df["p3"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 4 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 3),
             axis=1,
         )
         df["p2"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 3 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 2),
             axis=1,
         )
         df["p1"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 2 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 1),
             axis=1,
         )
 
         df["p1'"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) - 1 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end])),
             axis=1,
         )
         df["p2'"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) + 0 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) + 1 ),
             axis=1,
         )
         df["p3'"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) + 1 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) + 2),
             axis=1,
         )
         df["p4'"] = df.apply(
-            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) + 2 + add),
+            lambda row: self._get_aa(row["Protein"], int(row[start_or_end]) + 3 ),
             axis=1,
         )
         return df
 
 
-def calc_height(p, q):
+def get_kl(p, q):
     """
     KL-divergence
     """
     I = (p * np.log2(p / q)).sum(axis=1)
     return (p.T * I).T
-
-
-def get_height_from_norm(test, back):
-    height = calc_height(test.T, back.T)
-    return height

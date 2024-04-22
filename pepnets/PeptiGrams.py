@@ -1,12 +1,15 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-import matplotlib
+
+import pandas as pd
+
+plt.rcParams["font.family"] = "Arial"
 
 
 class PeptiGram:
-    def __init__(self, dm, design):
-        self.dm = dm
+    def __init__(self, dm: pd.DataFrame, design: pd.DataFrame):
+        self.dm = dm.copy()
         self.design = design
 
     def plot_peptigram(
@@ -16,21 +19,18 @@ class PeptiGram:
         days: list,
         cmaps: list = None,
         color: dict = None,
-        cbar: bool = False,
-        print_mods: bool = True,
         xlim: list = [0, 0],
         size_factor: int = 1,
-        save_str : str = None
+        figsize=(10, 10),
+        annotate=True,
     ):
-        plt.rcParams.update({'font.size': 16*size_factor})
         data = self.dm
         data["Protein"] = data["Cluster"].apply(lambda x: x.split("_")[0])
         data = data[data["Protein"] == protein].copy().reset_index()
         design = self.design
+        all_samples = design["sample"].values
         design = design[design["group"].isin(groups)]
         design = design[design["day"].isin(days)]
-
-        all_samples = design[design["day"].isin(days)]["sample"].values
 
         min_start = min(data["Start"].astype(int))
         max_end = max(data["End"].astype(int))
@@ -39,7 +39,6 @@ class PeptiGram:
             xlim = [min_start - 1, max_end + 1]
 
         sequence_range = range(min_start, max_end)
-        n_bases = len(sequence_range)
 
         if not cmaps:
             cmaps = [
@@ -67,41 +66,9 @@ class PeptiGram:
             data["Cluster"].unique().tolist(), key=lambda x: int(x.split("_")[-1])
         )
 
-        """
-        This gets height_ratios
-        """
-        heights = []
-        for group in groups:
-            max_heights = []
-            samples = design[design["group"] == group]
-            for day in days:
-                max_height = 20
-                for cluster in data["Cluster"].unique():
-                    columns = samples[samples["day"] == day][
-                        "sample"
-                    ].values.tolist() + [
-                        "Start",
-                        "End",
-                        "Cluster",
-                    ]
-                    datamatrix = data[columns].set_index(["Start", "End", "Cluster"])
-                    datamatrix["mean"] = datamatrix.mean(axis=1)
-                    datamatrix = datamatrix[datamatrix["mean"] > 0]
-                    datamatrix.reset_index(inplace=True)
-                    sequence = np.zeros(len(sequence_range))
-                    for row in datamatrix.iterrows():
-                        row = row[1]
-                        start = row["Start"] - min_start
-                        end = row["End"] - min_start
-                        cluster_id = cluster_idx.index(row["Cluster"])
-                        max_i = 0
-                        for i in range(int(start), int(end)):
-                            sequence[i] += 1
-                            max_i = max(max_i, sequence[i])
-                            max_height = max(max_i, max_height)
-                    max_heights.append(max_height)
-
-            heights.append(max(max_heights))
+        heights = self.get_heights(
+            groups, design, days, data, min_start, cluster_idx, sequence_range
+        )
 
         if sum(heights) == 0:
             print("No peptides in data")
@@ -112,17 +79,13 @@ class PeptiGram:
         fig, axs = plt.subplots(
             len(heights),
             len(days),
-            figsize=(
-                n_bases * len(days) * size_factor / 45,
-                sum(heights[1:]) * size_factor / 18,
-            ),
+            figsize=figsize,
             gridspec_kw={"height_ratios": np.array(heights)},
             sharex=True,
         )
 
-        max_color_int = 0
-
-        max_mean = max(data[all_samples].mean(axis=1))
+        mean_mean_intensity = np.mean(data[all_samples].mean(axis=1))
+        std_mean_intensity = np.std(data[all_samples].mean(axis=1))
 
         for day in days:
             day_index = days.index(day)
@@ -140,7 +103,6 @@ class PeptiGram:
                     "End",
                     "Cluster",
                     "Peptide",
-                    "Mods",
                 ]
 
                 if len(columns) == 3:
@@ -151,11 +113,15 @@ class PeptiGram:
                     datamatrix = (
                         data[columns]
                         .copy()
-                        .set_index(["Start", "End", "Cluster", "Peptide", "Mods"])
+                        .set_index(["Start", "End", "Cluster", "Peptide"])
                     )
-                    datamatrix["mean"] = datamatrix.mean(axis=1, numeric_only=True)
+                    datamatrix["mean"] = datamatrix.mean(
+                        axis=1, numeric_only=True
+                    )  # takes the mean of peptide intensities for each peptide
 
-                    datamatrix = datamatrix[datamatrix["mean"] > 0].copy()
+                    datamatrix = datamatrix[
+                        datamatrix["mean"] > 0
+                    ].copy()  # removes the peptides which arent in group and day
                     datamatrix.reset_index(inplace=True)
 
                     spaces = np.zeros((int(max(heights)), int(max_end)))
@@ -165,8 +131,6 @@ class PeptiGram:
                         ["Start", "length"], inplace=True, ascending=[True, False]
                     )
 
-                    max_height = 0
-
                     for row in datamatrix.iterrows():
                         row = row[1]
                         start = int(row["Start"])
@@ -174,15 +138,16 @@ class PeptiGram:
                         cluster_id = cluster_idx.index(row["Cluster"])
                         cmap = plt.get_cmap(cmaps[cluster_id])
 
-                        if color and isinstance(color, str) and color == "constant":
+                        if color and (isinstance(color, str) or color == "constant"):
                             color_intensity = 150
                         elif color:
                             sequence = row["Peptide"]
                             color_intensity = color[sequence]
                         else:
-                            color_intensity = 0.25 + (row["mean"] / (max_mean)) / 1.25
-
-                        max_color_int = max(color_intensity, max_color_int)
+                            color_intensity = (
+                                max(0.2, (1.96 + row["mean"] - mean_mean_intensity) / std_mean_intensity)
+                            ) / 2  # the color is equal to the mean
+                            
 
                         for height in range(spaces.shape[0]):
                             position = spaces[height, start:end]
@@ -195,26 +160,14 @@ class PeptiGram:
                                     linewidth=2 * size_factor,
                                     solid_capstyle="round",
                                 )
-                                if print_mods:
-                                    mods = self.parse_mod(row["Mods"].split("|"))
-                                    for mod in mods:
-                                        mod_index = mod[0]
-                                        mod_letter = mod[1]
-                                        ax.text(
-                                            x=start + mod_index,
-                                            y=-height - 1,
-                                            s=mod_letter,
-                                            fontsize=4,
-                                        )
                                 break
                     ax.set_ylim([-heights[group_index + 1] - 2, 0])
                     ax.set_xlim(xlim)
-                    ax.set_ylabel(group, fontsize=16*size_factor)
+                    ax.set_ylabel(group)
                     ax.set_yticks([])
-                
                     ax.axhline(0, 0, 1, color="lightgray", linestyle="--")
                     sns.despine(top=True, bottom=True, right=True, left=True, ax=ax)
-            
+
             for day in days:
                 day_index = days.index(day)
                 columns = design[design["day"] == day]["sample"].values.tolist() + [
@@ -248,35 +201,53 @@ class PeptiGram:
                         width=1,
                         alpha=0.5,
                     )
-
-                    ax.annotate(
-                         cluster.split("_")[-1],
-                         xy=(np.argmax(spaces), np.max(spaces)),
-                         size=10,
-                     )
+                    if annotate:
+                        ax.annotate(
+                            cluster.split("_")[-1],
+                            xy=(np.argmax(spaces), np.max(spaces)),
+                            size=10,
+                        )
                 ax.set_xlim(xlim)
-                ax.set_title(day, pad=5*size_factor)
+                # ax.set_title(day, pad=5)
                 ax.set_yticks([])
                 sns.despine(ax=ax, top=True, bottom=True, right=True, left=True)
 
-        plt.suptitle(f"{protein}", y=1 + 0.1 * size_factor, fontsize=20 * size_factor)
+        plt.suptitle(f"{protein}", y=1 + 0.1 * size_factor, fontsize=20)
         plt.tight_layout()
-        plt.subplots_adjust(hspace=0.05*size_factor)
+        plt.subplots_adjust(hspace=0.05)
 
-        if cbar:
-            cax = fig.add_axes([1.1, 0.1, 0.025, 0.8])
-            norm = matplotlib.colors.Normalize(vmin=0, vmax=max_color_int)
-            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-            fig.colorbar(sm, cax=cax, label="AMP Score")
-        if save_str:
-            plt.savefig(save_str, dpi=300, bbox_inches="tight")
+    def get_heights(
+        self, groups, design, days, data, min_start, cluster_idx, sequence_range
+    ):
+        heights = []
+        for group in groups:
+            max_heights = []
+            samples = design[design["group"] == group]
+            for day in days:
+                max_height = 20
+                for _ in data["Cluster"].unique():
+                    columns = samples[samples["day"] == day][
+                        "sample"
+                    ].values.tolist() + [
+                        "Start",
+                        "End",
+                        "Cluster",
+                    ]
+                    datamatrix = data[columns].set_index(["Start", "End", "Cluster"])
+                    datamatrix["mean"] = datamatrix.mean(axis=1)
+                    datamatrix = datamatrix[datamatrix["mean"] > 0]
+                    datamatrix.reset_index(inplace=True)
+                    sequence = np.zeros(len(sequence_range))
+                    for row in datamatrix.iterrows():
+                        row = row[1]
+                        start = row["Start"] - min_start
+                        end = row["End"] - min_start
+                        max_i = 0
+                        for i in range(int(start), int(end)):
+                            sequence[i] += 1
+                            max_i = max(max_i, sequence[i])
+                            max_height = max(max_i, max_height)
+                    max_heights.append(max_height)
 
-    def parse_mod(self, mods):
-        parsed_mods = []
-        mods = [m for m in mods if m != ""]
-        for mod in mods:
-            mod_list = mod[1:-1].split(",")
-            mod_index = int(mod_list[0])
-            m = str(mod_list[1])
-            parsed_mods.append((mod_index, m))
-        return parsed_mods
+            heights.append(max(max_heights))
+        return heights
