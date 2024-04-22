@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="Asset 4.svg", width="250" />
+    <img src="logo.svg", width="250" />
 <p>
 
 # clustering linear peptide sequences on protein backbones
