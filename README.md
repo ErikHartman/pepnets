@@ -8,16 +8,16 @@ This package clusters linear peptides that are degradation products of proteins 
 
 The package includes modules to perform the clustering and 3 modules for down-stream analysis and visualization:
 
-- FeatureMatrix: generates a feature matrix which can be used for further analysis of clusters.
+- FeatureMatrix: generates a feature matrix which can be used for further analysis of clusters in e.g. ML applications.
 - PeptiGrams: Plots [peptigram-esque](http://bioware.ucd.ie/peptigram/) plots to visualize the peptidome from a protein.
 - LogoPlot: Computes and plots the cut-site specificity. 
 
 
 ## analysis
 
-The repo also contains code and data to recreate the majority of the figures for the pig-samples from the [study](https://www.biorxiv.org/content/10.1101/2023.12.28.573527v1) in the `/notebook/analysis.ipynb`- notebook. The notebook is seeded, but non-deterministic algorithms (e.g., Leiden) may still result in slight variations due to different processors. These variations do not impact any conclusions drawn in the paper.
+The repo also contains code and data to recreate the majority of the figures from the [study](https://www.biorxiv.org/content/10.1101/2023.12.28.573527v1) in the `/notebook/recreate_figs/`- notebooks. The notebooks are seeded, but non-deterministic algorithms (e.g., Leiden) may still result in slight variations due to different processors. These variations do not impact any conclusions drawn in the paper.
 
-To run the `/notebook/analysis.ipynb`- notebook, you need to install additional dependencies from the ones described below.
+To run the `/notebook/recreate_figs/`- notebooks, you need to install additional dependencies from the ones described below.
 
 
 ## install
@@ -37,9 +37,9 @@ The software has been tested with python 3.9.6
 ```py
 pnet = PeptideNetwork(
     datamatrix=datamatrix,
-    protein_database=sus_scrofa,
+    protein_database=database_dict,
 )
-
+pnet.create_network(distance_cutoff=4)
 pnet.get_clusters(resolution=0.8)
 ```
 ```py
@@ -60,9 +60,10 @@ peptigram.plot_peptigram(
 ![peptigram](plots/APOA1_pg.png "peptigram")
 
 ```py
-lp = LogoPlot(fm.datamatrix, design, sus_scrofa, topn)
+lp = LogoPlot(fm.dm, database_dict)
+
 height = lp.get_letter_heights(test_samples, background_samples)
-fig, ax = plt.subplots(1,1)
+fig, ax = plt.subplots(1, 1)
 lp.plot(height, ax=ax)
 ```
 
