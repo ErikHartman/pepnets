@@ -1,8 +1,4 @@
-<p align="center">
-    <img src="logo.svg", width="250" />
-<p>
-
-# clustering linear peptide sequences on protein backbones
+# Clustering linear peptide sequences on protein backbones
 
 This package clusters linear peptides that are degradation products of proteins based on their sequence. The package was created and used in a [study where we analyzed the wound fluids from infected wounds.](https://www.biorxiv.org/content/10.1101/2023.12.28.573527v1) The example data in the [notebook](notebooks/example.ipynb) and showcased [below](#usage) is from that study.
 
@@ -12,6 +8,12 @@ The package includes modules to perform the clustering and 3 modules for down-st
 - PeptiGrams: Plots [peptigram-esque](http://bioware.ucd.ie/peptigram/) plots to visualize the peptidome from a protein.
 - LogoPlot: Computes and plots the cut-site specificity. 
 
+---
+**NOTE**
+
+This code could be optimized and tailored for different purposes in many ways. It is not meant to be an all-purpose package, but a package that showcases how the method presented in our study was implemented. Our hope is that it is directly useful to some, and that others gain inspiration from it for their specific application.
+
+---
 
 ## analysis
 
